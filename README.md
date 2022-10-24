@@ -627,6 +627,8 @@ e.g. "language": "EN"
 
 3. These following example is the policy to apply the fallback mechanism to handle the failed/corner case
 
+*NOTE: The authenticate-certificate must be changed*
+
 ```xml
 <inbound>
         <base />
@@ -641,7 +643,7 @@ e.g. "language": "EN"
             </set-header>
             <authentication-certificate thumbprint="088939652FBE42760D567EA0EB7021521ABFED1F" />
         </send-request>
-        <!-- Set request to balance service -->
+        <!-- Set request to preference service -->
         <send-request mode="new" response-variable-name="preferencedetails" timeout="20" ignore-error="true">
             <set-url>@($"https://ananda-rep-api2.z-unified.com/preference/profiles/{(string)context.Variables["profileId"]}")</set-url>
             <set-method>GET</set-method>
