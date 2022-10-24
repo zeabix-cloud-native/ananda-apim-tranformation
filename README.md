@@ -602,11 +602,102 @@ However, some scenarios this is not what business would want it and usually in t
 
 ### Exercise
 
+Before you begin, we have provided new `preference` api via `https://ananda-rep-api.z-unified.com` which has detail below
+
+<br/>
+
+`GET /preference/profiles/{profileId}`
+
+This API will return language preference for each profile, for example
+
+```json
+{
+    "profile-id": 4,
+    "language": "TH"
+}
+```
+
+In this exercise we will aggregate preference data into Get profile API using aggregation pattern have we have done earlier
+
+When there is any error occur we will fallback to the default preference
+e.g. "language": "EN"
+
 1. Create another operation (within the same API as previous exercise), with difference suffix, e.g. `fallback`
 2. After create, open `Policy Code editor`
 
 3. These following example is the policy to apply the fallback mechanism to handle the failed/corner case
 
 ```xml
+<inbound>
+        <base />
+        <!-- Get profile ID from path parameters -->
+        <set-variable name="profileId" value="@(context.Request.MatchedParameters["id"])" />
+        <!-- Set request to profile service -->
+        <send-request mode="new" response-variable-name="profiledetails" timeout="20" ignore-error="true">
+            <set-url>@($"https://ananda-mock-api2.z-unified.com/api/profiles/{(string)context.Variables["profileId"]}")</set-url>
+            <set-method>GET</set-method>
+            <set-header name="Content-Type" exists-action="override">
+                <value>application/json</value>
+            </set-header>
+            <authentication-certificate thumbprint="088939652FBE42760D567EA0EB7021521ABFED1F" />
+        </send-request>
+        <!-- Set request to balance service -->
+        <send-request mode="new" response-variable-name="preferencedetails" timeout="20" ignore-error="true">
+            <set-url>@($"https://ananda-rep-api2.z-unified.com/preference/profiles/{(string)context.Variables["profileId"]}")</set-url>
+            <set-method>GET</set-method>
+            <set-header name="Content-Type" exists-action="override">
+                <value>application/json</value>
+            </set-header>
+            <authentication-certificate thumbprint="088939652FBE42760D567EA0EB7021521ABFED1F" />
+        </send-request>
+        <choose>
+            <when condition="@(((IResponse)context.Variables["preferencedetails"]).StatusCode == 200)">
+                <return-response>
+                    <set-status code="200" reason="OK" />
+                    <set-header name="Content-Type" exists-action="override">
+                        <value>application/json</value>
+                    </set-header>
+                    <set-body>@{
+                        var profile = ((IResponse)context.Variables["profiledetails"]).Body.As<JObject>();
+                        var pref = ((IResponse)context.Variables["preferencedetails"]).Body.As<JObject>();
+                    
+                        JObject response = new JObject();
+                        response["id"] = profile["id"];
+                        response["firstname"] = profile["firstname"];
+                        response["lastname"] = profile["lastname"];
+                        response["email"] = profile["email"];
+                        response["balance"] = profile["balance"];
+                        response["language"] = pref["language"];
 
+                        return response.ToString();
+                        }</set-body>
+                </return-response>
+            </when>
+            <otherwise>
+                <return-response>
+                    <set-status code="200" reason="OK" />
+                    <set-header name="Content-Type" exists-action="override">
+                        <value>application/json</value>
+                    </set-header>
+                    <set-body>@{
+                        var profile = ((IResponse)context.Variables["profiledetails"]).Body.As<JObject>();
+                        var pref = ((IResponse)context.Variables["preferencedetails"]).Body.As<JObject>();
+                    
+                        JObject response = new JObject();
+                        response["id"] = profile["id"];
+                        response["firstname"] = profile["firstname"];
+                        response["lastname"] = profile["lastname"];
+                        response["email"] = profile["email"];
+                        response["balance"] = profile["balance"];
+                        response["language"] = "EN";
+
+                        return response.ToString();
+                        }</set-body>
+                </return-response>
+            </otherwise>
+        </choose>
+ </inbound>
 ```
+
+4. Save and test API
+5. Trace API to see how it works
